@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                      Classifier Model Sample.mq5 |
+//|                                       Regressor Model sample.mq5 |
 //|                                     Copyright 2023, Omega Joctan |
 //|                        https://www.mql5.com/en/users/omegajoctan |
 //+------------------------------------------------------------------+
@@ -13,12 +13,12 @@
 #include <MALE5\metrics.mqh> //fo measuring the performance
 
 input ENUM_TIMEFRAMES default_timeframe=PERIOD_CURRENT;
-input int bars_lookback=14;
-input int bars_shift=1;
-input int data_size = 1000;
+input int bars_lookback = 14;
+input int bars_shift = 1;
+input int data_size = 100;
 
 StandardizationScaler scaler; //standardization scaler from preprocessing.mqh
-CDecisionTreeClassifier *decision_tree; //a decision tree classifier model
+CDecisionTreeRegressor *decision_tree; //a decision tree classifier model
 
 MqlRates rates[];
 //+------------------------------------------------------------------+
@@ -26,12 +26,11 @@ MqlRates rates[];
 //+------------------------------------------------------------------+
 int OnInit()
   {
-  
+
 //--- Model selection
    
-     decision_tree = new CDecisionTreeClassifier(2, 5); //a decision tree classifier from DecisionTree class
-     
-//---
+     decision_tree = new CDecisionTreeRegressor(2, 5); //a decision tree classifier from DecisionTree class
+
 
      vector open, high, low, close;
      
@@ -50,58 +49,39 @@ int OnInit()
      X.Col(high, 1);
      X.Col(low, 2);
      
-//--- Since we are using the x variables to predict y, we choose the close price to be the target variable 
-   
-     vector y(data_size); 
-     for (int i=0; i<data_size; i++)
-       {
-         if (close[i]>open[i]) //a bullish candle appeared
-           y[i] = 1; //buy signal
-         else
-           {
-             y[i] = 0; //sell signal
-           } 
-       }
-
+     vector y = close; // The target variable is the close price, using open, high and low values were want to predict the next closing price
+     
 //--- We split the data into training and testing samples for training and evaluation
  
      matrix X_train, X_test;
      vector y_train, y_test;
      
-     double train_size = 0.7; //70% of the data should be used for training the rest for testing
+     double train_size = 0.7; //70% of the data to be used for training the rest 30% for testing
      int random_state = 42; //we put a random state to shuffle the data so that a machine learning model understands the patterns and not the order of the dataset, this makes the model durable
       
      MatrixExtend::TrainTestSplitMatrices(X, y, X_train, y_train, X_test, y_test, train_size, random_state); // we split the x and y data into training and testing samples         
      
-
 //--- Normalizing the independent variables
    
      X_train = scaler.fit_transform(X_train); // we fit the scaler on the training data and transform the data alltogether
      X_test = scaler.transform(X_test); // we transform the new data this way
      
-
 //--- Training the  model
      
      decision_tree.fit(X_train, y_train); //The training function 
      
 //--- Measuring predictive accuracy 
    
-     vector train_predictions = decision_tree.predict_bin(X_train);
+     vector train_predictions = decision_tree.predict(X_train);
      
-     Print("Training results classification report");
-     Metrics::classification_report(y_train, train_predictions);
+     printf("Decision decision_tree training r2_score = %.3f ",Metrics::RegressionMetric(y_train, train_predictions, METRIC_R_SQUARED));
 
 //--- Evaluating the model on out-of-sample predictions
      
-     vector test_predictions = decision_tree.predict_bin(X_test);
+     vector test_predictions = decision_tree.predict(X_test);
      
-     Print("Testing results classification report");
-     Metrics::classification_report(y_test, test_predictions); 
-     
-//---
+     printf("Decision decision_tree out-of-sample r2_score = %.3f ",Metrics::r_squared(y_test, test_predictions)); 
 
-    ArraySetAsSeries(rates, true);
-        
 
    return(INIT_SUCCEEDED);
   }
@@ -125,9 +105,9 @@ void OnTick()
    
    vector x = {rates[0].open, rates[0].high, rates[0].low}; //Assigning data from the recent candle in a similar way to the training data
    
-   x = scaler.transform(x);
-   int signal = (int)decision_tree.predict_bin(x);
+   x  = scaler.transform(x);
+   double predicted_close_price = decision_tree.predict(x);
    
-   Comment("Signal = ",signal==1?"BUY":"SELL");  //Ternary operator for checking if the signal is either buy or sell
+   Comment("Next closing price predicted is = ",predicted_close_price);  
   }
 //+------------------------------------------------------------------+

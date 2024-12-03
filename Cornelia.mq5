@@ -66,7 +66,7 @@ void OnTick()
     for(int i=0; i < PositionsTotal(); i++) {
         if(PositionGetSymbol(i) == Symbol()) {
             ulong ticket = PositionGetTicket(i);
-            int magic = (int)PositionGetInteger(POSITION_MAGIC);
+            ulong magic = (int)PositionGetInteger(POSITION_MAGIC);
             //printf(IntegerToString(magic));
             if(positionInfo.SelectByTicket(ticket)) {
 
